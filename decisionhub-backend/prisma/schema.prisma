@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String        @id @default(uuid())
+  email          String        @unique
+  password       String
+  name           String
+  role           Role          @default(USER)
+  emailVerified  Boolean       @default(false)
+  profile        Profile?
+  decisions      Decision[]
+  votes          Vote[]
+  comments       Comment[]
+  notifications  Notification[]
+  bookmarks      Bookmark[]
+  followers      Follow[]      @relation("userFollowers")
+  following      Follow[]      @relation("userFollowing")
+  reports        Report[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+enum Role {
+  GUEST
+  USER
+  MODERATOR
+  ADMIN
+}
+
+model Profile {
+  id        String  @id @default(uuid())
+  user      User    @relation(fields: [userId], references: [id])
+  userId    String  @unique
+  bio       String?
+  avatarUrl String?
+  reputation Int     @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  decisions   Decision[]
+  createdAt   DateTime   @default(now())
+}
+
+model Decision {
+  id             String      @id @default(uuid())
+  title          String
+  description    String
+  imageUrl       String?
+  category       Category    @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  author         User        @relation(fields: [authorId], references: [id])
+  authorId       String
+  tags           String[]    @default([])
+  expirationDate DateTime?
+  options        Option[]
+  votes          Vote[]
+  comments       Comment[]
+  bookmarks      Bookmark[]
+  reports        Report[]
+  views          Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model Option {
+  id         String   @id @default(uuid())
+  label      String
+  decision   Decision @relation(fields: [decisionId], references: [id])
+  decisionId String
+  votes      Vote[]
+  createdAt  DateTime @default(now())
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  decision   Decision @relation(fields: [decisionId], references: [id])
+  decisionId String
+  option     Option   @relation(fields: [optionId], references: [id])
+  optionId   String
+  explanation String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, decisionId])
+}
+
+model Comment {
+  id          String     @id @default(uuid())
+  author      User       @relation(fields: [authorId], references: [id])
+  authorId    String
+  decision    Decision   @relation(fields: [decisionId], references: [id])
+  decisionId  String
+  parent      Comment?   @relation("CommentReplies", fields: [parentId], references: [id])
+  parentId    String?
+  replies     Comment[]  @relation("CommentReplies")
+  content     String
+  likes       Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  reports     Report[]
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  title      String
+  message    String
+  context    Json?
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Bookmark {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  decision   Decision @relation(fields: [decisionId], references: [id])
+  decisionId String
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, decisionId])
+}
+
+model Follow {
+  id         String   @id @default(uuid())
+  follower   User     @relation("userFollowing", fields: [followerId], references: [id])
+  followerId String
+  following  User     @relation("userFollowers", fields: [followingId], references: [id])
+  followingId String
+  createdAt  DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+model Report {
+  id          String     @id @default(uuid())
+  reporter    User       @relation(fields: [reporterId], references: [id])
+  reporterId  String
+  decision    Decision?  @relation(fields: [decisionId], references: [id])
+  decisionId  String?
+  comment     Comment?   @relation(fields: [commentId], references: [id])
+  commentId   String?
+  type        ReportType
+  reason      String
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum ReportType {
+  SPAM
+  ABUSE
+  INAPPROPRIATE
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+}
